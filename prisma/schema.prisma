@@ -1,0 +1,441 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum GenderType {
+  MALE
+  FEMALE
+  OTHER
+}
+
+
+model gender {
+  id          Int    @id 
+  name        GenderType
+  isActive    Boolean @default(true)
+  users    user[]
+}
+
+model userType {
+  id          Int @id
+  name        String
+  isActive Boolean @default(true)
+  users    user[]
+}
+
+model user {
+  id              Int      @id @default(autoincrement())
+  firstName    String?    @db.VarChar(255)
+  lastName     String?    @db.VarChar(500)
+  birthDate    DateTime?
+  genderId      Int?   
+  email String @unique @db.VarChar(255)
+  profilePicture String? @db.VarChar(200)
+  displayName  String?   @db.VarChar(100)
+  displayEmail  String?   @db.VarChar(100)
+  timeZoneId   Int?
+  dateFormat   String?   @db.VarChar(50)
+  timeFormat   String?   @db.VarChar(50)
+  isEmailVerified Boolean? @default(false)
+  password        String?
+  userTypeId      Int
+  isActive        Boolean? @default(false)
+  updatedAt       DateTime? @updatedAt
+  createdAt       DateTime @default(now())
+
+  // Relationships
+  timezone    timezone?    @relation(fields: [timeZoneId], references: [id])
+  gender      gender?    @relation(fields: [genderId], references: [id])
+  userType    userType    @relation(fields: [userTypeId], references: [id])
+}
+
+
+model role {
+  id          Int  @id
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+  diplomats   diplomat[]
+}
+
+model diplomat {
+  id                 Int               @id @default(autoincrement())
+  userId             Int               @unique
+  officialEmail      String?           @unique
+  isOfficialEmailVerified Boolean? @default(false)
+  currentOnboardingStep Int? @default(1)
+  homeCountry        Json?
+  assignedCountry    Json?
+  assignedCity       Json?
+  roleId             Int?
+  customRole         String?
+  yearsOfExperienceId  Int?
+  introduction       String?
+  missionInstitutionId Int?
+  isWithSpouse       Boolean?
+  isWithChildren     Boolean?
+  isNeedHousingHelp  Boolean?
+  isWithPets         Boolean?
+  pets               Json?
+  isPlanAdoptingPets Boolean?
+  role               role?              @relation(fields: [roleId], references: [id])
+  missionInstitution missionInstitution? @relation(fields: [missionInstitutionId], references: [id])
+  yearsOfExperience yearsOfExperience? @relation(fields: [yearsOfExperienceId], references: [id])
+  languageSkills     languageSkills[]
+  hobbies            Json?
+  insuranceTypes     Json?   
+  chronicDiseases    Json?
+  vehicleType       Json?           
+  createdAt          DateTime
+  updatedAt          DateTime?
+}
+
+
+model otp {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  isVerified  Boolean? @default(false)
+  isPasswordTaken Boolean? @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+
+model taskType {
+  id          Int                @id
+  name        String
+  description String?
+  process     String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime
+  updatedAt   DateTime?
+  categories  taskTypeCategory[]
+  tasks       task[]
+  recommendedTasks recommendedTask[]  // New relation field for recommendedTask
+}
+
+
+model taskTypeCategory {
+  taskTypeId  Int
+  categoryId  Int
+  isActive    Boolean @default(true)
+  taskType    taskType   @relation(fields: [taskTypeId], references: [id])
+  category    category   @relation(fields: [categoryId], references: [id])
+  @@id([taskTypeId, categoryId])
+}
+
+model category {
+  id            Int               @id
+  name          String            @db.VarChar(255)
+  description   String?           @db.VarChar(255)
+  isActive      Boolean @default(true)
+  createdAt     DateTime
+  updatedAt     DateTime?
+  taskTypes     taskTypeCategory[]
+  tasks         taskCategory[]    // Relation to the join table
+}
+
+model task {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  taskTypeId    Int
+  taskStatusId  Int
+  remindDate    DateTime?
+  dueDate       DateTime?
+  priorityId    Int
+  documents     Json?   
+  notes         String?   
+  subTasks      Json?   
+  customTitle   String?
+  customDescription String?  
+  isActive    Boolean @default(true)
+  createdAt     DateTime
+  updatedAt     DateTime?
+  categories    taskCategory[]    // Relation to the join table
+
+  //Relationships
+  taskStatus    taskStatus  @relation(fields: [taskStatusId], references: [id])
+  taskType      taskType  @relation(fields: [taskTypeId], references: [id])
+  priority      priority  @relation(fields: [priorityId], references: [id])
+}
+
+model recommendedTask {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  taskTypeId    Int
+  taskStatusId  Int
+  priorityId    Int
+  notes         String?   
+  isActive      Boolean @default(true)
+  createdAt     DateTime
+  updatedAt     DateTime?
+  categories    taskCategory[]    // Relation to the join table
+
+  // Relationships
+  taskStatus    taskStatus  @relation(fields: [taskStatusId], references: [id])
+  taskType      taskType  @relation(fields: [taskTypeId], references: [id])
+  priority      priority  @relation(fields: [priorityId], references: [id])
+}
+
+
+
+model taskCategory {
+  id            Int       @id @default(autoincrement())
+  taskId            Int?
+  recommendedTaskId Int?    // Nullable for tasks without a recommendedTask relation
+  categoryId        Int
+  isActive          Boolean @default(true)
+  
+  task              task?             @relation(fields: [taskId], references: [id])
+  recommendedTask   recommendedTask?  @relation(fields: [recommendedTaskId], references: [id])  // New relation field
+  category          category          @relation(fields: [categoryId], references: [id])
+}
+
+model taskStatus {
+  id          Int   @id  
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive    Boolean @default(true)
+  tasks       task[]
+  recommendedTasks recommendedTask[]  // New relation field for recommendedTask
+}
+
+model priority {
+  id          Int     @id
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive    Boolean @default(true)
+  tasks       task[]
+  recommendedTasks recommendedTask[]  // New relation field for recommendedTask
+}
+
+model paymentMethods {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  cardNumber   String?   @db.VarChar(200)
+  cardHolderName String? @db.VarChar(200)
+  billingAddress String? @db.VarChar(300)
+  expiryDate   DateTime?
+  cvc          String
+  isDefault    Boolean
+  isActive     Boolean @default(true)
+  createdAt    DateTime
+  updatedAt    DateTime?
+}
+
+model integrations {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  appName       String?   @db.VarChar(200)
+  description   String?   @db.VarChar(500)
+  isConnected      Boolean
+  isActive    Boolean @default(true)
+  createdAt     DateTime
+  updatedAt     DateTime?
+
+  // Tokens for authentication
+  accessToken   String?   @db.VarChar(255)
+  refreshToken  String?   @db.VarChar(255)
+  tokenExpiresAt DateTime?
+}
+
+model billingInvoices {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  name          String?   @db.VarChar(500)
+  description   String?
+  amount        Float?
+  currency    String?  @db.VarChar(20)
+  billingStatusId Int
+  stripeDetail  Json?    
+  billingStatus billingStatus  @relation(fields: [billingStatusId], references: [id]) 
+  isActive      Boolean @default(true)
+  createdAt     DateTime
+  paidAt        DateTime?
+  updatedAt     DateTime?
+}
+
+model country {
+  id          Int      @id
+  name        String   @db.VarChar(100)
+  code        String?   @db.VarChar(10)
+  dialingCode String?  @db.VarChar(255)
+  flag        String?   @db.VarChar(200)
+  isActive    Boolean @default(true)
+  missionInstitutions missionInstitution[]
+  subHubs subHub[]
+}
+
+model billingStatus {
+  id          Int      @id
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+  billingInvoices billingInvoices[]
+}
+
+model languageSkills {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  languageId  Int
+  levelId     Int
+  isActive Boolean @default(true)
+  createdAt   DateTime
+  updatedAt   DateTime?
+  //Relationships
+  language language  @relation(fields: [languageId], references: [id])
+  level    level  @relation(fields: [levelId], references: [id])
+  diplomat    diplomat  @relation(fields: [userId], references: [userId])
+}
+
+model language {
+  id          Int  @id   
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+  skills      languageSkills[]
+}
+
+model level {
+  id          Int  @id   
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+  skills      languageSkills[]
+}
+
+model timezone {
+  id          Int     @id
+  name        String   @db.VarChar(100)
+  code       String?  @db.VarChar(255)
+  value       String?  @db.VarChar(255)
+  region      String?  @db.VarChar(100)
+  isActive Boolean @default(true)
+  users    user[]
+}
+
+
+model chronicDiseases {
+  id          Int    @id
+  name        String   @db.VarChar(200)
+  description String?  @db.VarChar(500)
+  isActive Boolean @default(true)
+}
+
+model insuranceType {
+  id          Int @id    
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+}
+
+model hobbies {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+  createdAt   DateTime
+  updatedAt   DateTime?
+}
+
+model vehicleType {
+  id          Int   @id 
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+}
+
+model userMemberships {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  membershipId Int
+  startedAt   DateTime?
+  endedAt     DateTime?
+  amount      Float
+  currency    String?  @db.VarChar(20)
+  isActive    Boolean @default(true)
+  createdAt   DateTime
+  updatedAt   DateTime?
+  //Relationships
+  memberships memberships  @relation(fields: [membershipId], references: [id])
+}
+
+model memberships {
+  id          Int      @id @default(autoincrement()) // Ensure this field is marked as @id
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  amount      Float
+  currency    String?  @db.VarChar(20)
+  isActive    Boolean  @default(true)
+  userMemberships userMemberships[]
+}
+
+model city {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  countryId   Int
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+  missionInstitutions missionInstitution[]
+}
+
+model missionInstitution {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description        String   @db.VarChar(500)
+  countryId   Int
+  cityId      Int
+  isActive Boolean @default(true)
+  diplomats   diplomat[]
+  //Relationships
+  city        city      @relation(fields: [cityId], references: [id])
+  country     country   @relation(fields: [countryId], references: [id])
+}
+
+model SeedHistory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  executedAt DateTime @default(now())
+}
+
+
+model yearsOfExperience {
+  id          Int      @id 
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  isActive Boolean @default(true)
+  diplomats diplomat[]
+}
+
+model hub {
+  id          Int      @id 
+  name        String   @db.VarChar(100)
+  description String?
+  tags        Json? 
+  isActive    Boolean @default(true)
+  subHubs     subHub[]
+}
+
+model subHub {
+  id          Int      @id @default(autoincrement()) 
+  name        String   @db.VarChar(100)
+  description String?
+  tags        Json? 
+  overview    String?
+  detail      Json?
+  isActive    Boolean @default(true)
+  hubId       Int 
+  hubs        hub      @relation(fields: [hubId], references: [id])
+  
+  principalContent Json?
+  rightContend Json?
+  countryId   Int?
+  //Relationships
+  country     country?   @relation(fields: [countryId], references: [id])
+}
