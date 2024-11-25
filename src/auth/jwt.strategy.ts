@@ -25,12 +25,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException();
     }
-    let assignedCountryId;
-    if (user.userTypeId === UserTypeList.Diplomat) {
-      const diplomat = await this.prisma.diplomat.findUnique({ where: { userId: user.id } });
-      if (diplomat) assignedCountryId = diplomat.assignedCountry["id"];
-    }
-    return { id: user.id, email: user.email, userType: user.userTypeId, assignedCountryId: assignedCountryId };
+    // let assignedCountryId;
+    // if (user.userTypeId === UserTypeList.Diplomat) {
+    //   const diplomat = await this.prisma.diplomat.findUnique({ where: { userId: user.id } });
+    //   if (diplomat) assignedCountryId = diplomat.assignedCountry["id"];
+    // }
+    return { id: user.id, email: user.email, userType: user.userTypeId };
   }
 }
 
