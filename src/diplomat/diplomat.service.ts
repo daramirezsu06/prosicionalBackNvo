@@ -19,10 +19,11 @@ export class DiplomatService {
 
     async getDiplomatProfile(userId: number) {
         const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            include: {
-                timezone: { select: { region: true, code: true, id: true } }
-            }
+          where: { id: userId },
+          include: {
+            timezone: { select: { region: true, code: true, id: true } },
+            gender: { select: { id: true, name: true } },
+          },
         });
         const diplomat = await this.prisma.diplomat.findFirst({
             where: { userId: userId },
