@@ -12,184 +12,214 @@ import { PreChecklistDiplomatDTO } from './dto/pre.checklist.diplomat';
 
 @Injectable()
 export class DiplomatService {
-    constructor(
-        private prisma: PrismaService,
-        private authService: AuthService
-    ) { }
+  constructor(
+    private prisma: PrismaService,
+    private authService: AuthService,
+  ) {}
 
-    async getDiplomatProfile(userId: number) {
-        const user = await this.prisma.user.findUnique({
-          where: { id: userId },
+  async getDiplomatProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        timezone: { select: { region: true, code: true, id: true } },
+        gender: { select: { id: true, name: true } },
+      },
+    });
+    const diplomat = await this.prisma.diplomat.findFirst({
+      where: { userId: userId },
+      include: {
+        languageSkills: {
           include: {
-            timezone: { select: { region: true, code: true, id: true } },
-            gender: { select: { id: true, name: true } },
+            language: { select: { name: true, id: true, description: true } },
+            level: { select: { name: true, id: true, description: true } },
           },
-        });
-        const diplomat = await this.prisma.diplomat.findFirst({
-            where: { userId: userId },
-            include: {
-                languageSkills: {
-                    include: {
-                        language: { select: { name: true, id: true, description: true } },
-                        level: { select: { name: true, id: true, description: true } },
-                    },
-                },
-                missionInstitution: {
-                    select: { name: true, description: true }
-                },
-                role: {
-                    select: { name: true, description: true }
-                },
-                yearsOfExperience: {
-                    select: { name: true, description: true }
-                },
-                // vehicleType: {
-                //     select: { name: true, description: true }
-                // },
-                // insuranceType: {
-                //     select: { name: true, description: true }
-                // },
-                // chronicDiseases: {
-                //     select: { name: true, description: true }
-                // },
-            },
-        });
+        },
+        missionInstitution: {
+          select: { name: true, description: true },
+        },
+        role: {
+          select: { name: true, description: true },
+        },
+        yearsOfExperience: {
+          select: { name: true, description: true },
+        },
+        // vehicleType: {
+        //     select: { name: true, description: true }
+        // },
+        // insuranceType: {
+        //     select: { name: true, description: true }
+        // },
+        // chronicDiseases: {
+        //     select: { name: true, description: true }
+        // },
+      },
+    });
 
-        if (!user || !diplomat) {
-            throw new HttpException('User or Diplomat not found', HttpStatus.NOT_FOUND);
-        }
-
-        return mapDiplomatProfile(user, diplomat);
+    if (!user || !diplomat) {
+      throw new HttpException(
+        'User or Diplomat not found',
+        HttpStatus.NOT_FOUND,
+      );
     }
 
-    async updateStep1(userId: number, dto: Step1HomeCountryDto) {
-        await this.prisma.diplomat.update({
-            where: { userId: userId },
-            data: {
-                homeCountry: dto.homeCountry,
-                assignedCountry: dto.assignedCountry,
-                currentOnboardingStep: 2,
-            },
-        });
+    return mapDiplomatProfile(user, diplomat);
+  }
 
-        return this.getDiplomatProfile(userId);
+  async updateStep1(userId: number, dto: Step1HomeCountryDto) {
+    await this.prisma.diplomat.update({
+      where: { userId: userId },
+      data: {
+        homeCountry: dto.homeCountry,
+        assignedCountry: dto.assignedCountry,
+        currentOnboardingStep: 2,
+      },
+    });
+
+    return this.getDiplomatProfile(userId);
+  }
+
+  async updateStep2(userId: number, dto: Step2PersonalDetailsDto) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        genderId: dto.genderId,
+        profilePicture: dto.profilePicture,
+      },
+    });
+
+    return this.getDiplomatProfile(userId);
+  }
+
+  async updateStep3(userId: number, dto: Step3LanguageSkillsDto) {
+    const existingRecord = await this.prisma.languageSkills.findFirst({
+      where: {
+        userId: userId,
+        languageId: dto.languageId,
+        levelId: dto.levelId,
+        isActive: true,
+      },
+    });
+
+    if (existingRecord) {
+      throw new HttpException('Record already exists', HttpStatus.CONFLICT);
     }
 
-    async updateStep2(userId: number, dto: Step2PersonalDetailsDto) {
-        await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-                firstName: dto.firstName,
-                lastName: dto.lastName,
-                genderId: dto.genderId,
-                profilePicture: dto.profilePicture,
-            },
-        });
+    await this.prisma.languageSkills.create({
+      data: {
+        userId,
+        languageId: dto.languageId,
+        levelId: dto.levelId,
+        createdAt: new Date(),
+      },
+    });
 
-        return this.getDiplomatProfile(userId);
+    return this.getDiplomatProfile(userId);
+  }
+  async deleteLanguageSkills(userId: number, languageSkillId: any) {
+    const skillId = parseInt(languageSkillId, 10); // Conversión explícita
+    if (isNaN(skillId)) {
+      throw new HttpException(
+        'Invalid languageSkillId',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    async updateStep3(userId: number, dto: Step3LanguageSkillsDto) {
-        const existingRecord = await this.prisma.languageSkills.findFirst({
-            where: {
-                userId: userId,
-                languageId: dto.languageId,
-                levelId: dto.levelId,
-                isActive: true,
-            },
-        });
+    const languageSkill = await this.prisma.languageSkills.findFirst({
+      where: {
+        id: skillId,
+        userId: userId,
+      },
+    });
 
-        if (existingRecord) {
-            throw new HttpException('Record already exists', HttpStatus.CONFLICT);
-        }
-
-        await this.prisma.languageSkills.create({
-            data: {
-                userId,
-                languageId: dto.languageId,
-                levelId: dto.levelId,
-                createdAt: new Date(),
-            },
-        });
-
-        return this.getDiplomatProfile(userId);
+    if (!languageSkill) {
+      throw new HttpException(
+        'Habilidad lingüística no encontrada',
+        HttpStatus.NOT_FOUND,
+      );
     }
 
-    async updatePrechecklist(userId: number, dto: PreChecklistDiplomatDTO) {
-        try {
+    await this.prisma.languageSkills.delete({
+      where: { id: skillId },
+    });
 
-            await this.prisma.diplomat.update({
-                where: { userId: userId },
-                data: {
-                    isNeedHousingHelp: dto.isNeedHousingHelp,
-                    isPlanAdoptingPets: dto.isPlanAdoptingPets,
-                    isWithChildren: dto.isWithChildren,
-                    isWithPets: dto.isWithPets,
-                    isWithSpouse: dto.isWithSpouse,
-                    insuranceTypes: dto.insuranceType,
-                    vehicleType: dto.vehicleType,
-                    hobbies: dto.hobbies,
-                    chronicDiseases: dto.chronicDiseases,
-                },
-            });
+    return this.getDiplomatProfile(userId);
+  }
 
-            return this.getDiplomatProfile(userId);
+  async updatePrechecklist(userId: number, dto: PreChecklistDiplomatDTO) {
+    try {
+      await this.prisma.diplomat.update({
+        where: { userId: userId },
+        data: {
+          isNeedHousingHelp: dto.isNeedHousingHelp,
+          isPlanAdoptingPets: dto.isPlanAdoptingPets,
+          isWithChildren: dto.isWithChildren,
+          isWithPets: dto.isWithPets,
+          isWithSpouse: dto.isWithSpouse,
+          insuranceTypes: dto.insuranceType,
+          vehicleType: dto.vehicleType,
+          hobbies: dto.hobbies,
+          chronicDiseases: dto.chronicDiseases,
+        },
+      });
 
-        } catch (error) {
-            throw new HttpException(CommonErrorName.SomethingWentWrong, HttpStatus.NOT_FOUND);
-        }
+      return this.getDiplomatProfile(userId);
+    } catch (error) {
+      throw new HttpException(
+        CommonErrorName.SomethingWentWrong,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  }
+
+  async sendOtp(userId: number, dto: SendOtpDTO) {
+    const diplomatExist = await this.prisma.diplomat.findUnique({
+      where: {
+        userId: userId,
+      },
+    });
+
+    if (!diplomatExist) {
+      throw new HttpException(
+        CommonErrorName.ResourceNotFound,
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    async sendOtp(userId: number, dto: SendOtpDTO) {
-        const diplomatExist = await this.prisma.diplomat.findUnique({
-            where: {
-                userId: userId,
-            },
-        });
+    await this.prisma.diplomat.update({
+      where: { id: diplomatExist.id },
+      data: {
+        updatedAt: new Date(),
+        officialEmail: dto.email,
+      },
+    });
+    await this.authService.sendOTPToEmail(dto.email);
+  }
 
-        if (!diplomatExist) {
-            throw new HttpException(
-                CommonErrorName.ResourceNotFound,
-                HttpStatus.BAD_REQUEST,
-            );
-        }
+  async updateDiplomatProfile(userId: number, dto: UpdateDiplomatProfileDTO) {
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          displayName: dto.displayName,
+          displayEmail: dto.displayEmail,
+        },
+      });
 
-        await this.prisma.diplomat.update({
-            where: { id: diplomatExist.id },
-            data: {
-                updatedAt: new Date(),
-                officialEmail: dto.email,
-            },
-        });
-        await this.authService.sendOTPToEmail(dto.email);
-    }
+      await this.prisma.diplomat.update({
+        where: { userId: userId },
+        data: {
+          missionInstitutionId: dto.missionInstitutionId,
+          assignedCity: dto.assignedCity,
+          roleId: dto.roleId,
+          customRole: dto.customRole,
+          yearsOfExperienceId: dto.yearsOfExperienceId,
+          introduction: dto.introduction,
+        },
+      });
 
-    async updateDiplomatProfile(userId: number, dto: UpdateDiplomatProfileDTO) {
-        try {
-
-            await this.prisma.user.update({
-                where: { id: userId },
-                data: {
-                    displayName: dto.displayName,
-                    displayEmail: dto.displayEmail,
-                },
-            });
-
-            await this.prisma.diplomat.update({
-                where: { userId: userId },
-                data: {
-                    missionInstitutionId: dto.missionInstitutionId,
-                    assignedCity: dto.assignedCity,
-                    roleId: dto.roleId,
-                    customRole: dto.customRole,
-                    yearsOfExperienceId: dto.yearsOfExperienceId,
-                    introduction: dto.introduction
-                },
-            });
-
-            return this.getDiplomatProfile(userId);
-        } catch (error) {
-
-        }
-    }
+      return this.getDiplomatProfile(userId);
+    } catch (error) {}
+  }
 }
